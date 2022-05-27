@@ -1,28 +1,69 @@
 <template>
   <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
+    <dc-form
+      :fields="fields"
+      @values-change="handleValuesChange"
+      @submit="handleSubmit"
+    />
   </div>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
-
 export default {
-  name: 'App',
-  components: {
-    HelloWorld
-  }
-}
+  name: "App",
+  data: () => {
+    return {
+      fields: [
+        {
+          type: "AInput",
+          label: "input1",
+          name: "input1",
+          rules: [
+            {
+              required: true,
+            },
+          ],
+        },
+        {
+          type: "DcForm",
+          label: "SubForm",
+          name: "subForm",
+          fields: [
+            {
+              type: "AInput",
+              label: "innerFields1",
+              name: "inner_fields1",
+              rules: [
+                {
+                  required: true,
+                },
+              ],
+            },
+            {
+              type: "AInput",
+              label: "innerFields2",
+              name: "inner_fields2",
+              rules: [
+                {
+                  required: true,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  },
+  methods: {
+    handleValuesChange(props, values, allValues) {
+      console.log("change:", JSON.stringify(allValues));
+    },
+    handleSubmit(values) {
+      console.log("submit", values);
+    },
+  },
+};
 </script>
 
 <style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
 </style>
