@@ -56,19 +56,16 @@ export default {
       // 根据表单实例，递归获取所有表单实例数组（包含子表单）
       const validators = this.getValidators();
       // 全部表单实例校验通过后，认为表单校验成功
-      Promise.allSettled(validators)
-        .then((res) => {
-          if (res.every((item) => item.status === "fulfilled")) {
-            this.$emit("submit", get(last(res), "value"));
-          } else {
-            throw new Error(res.map((item) => item.reason));
-          }
-        })
-        .catch((errs) => {
-          // TODO: 结构化的报错 log
-          console.log("subform errs:", errs(errs.slice(0, -1)));
-          console.log("errs:", errs.slice(-1));
-        });
+      Promise.allSettled(validators).then((res) => {
+        if (res.every((item) => item.status === "fulfilled")) {
+          this.$emit("submit", get(last(res), "value"));
+        } else {
+          const errs = res.map((item) => item.reason);
+          // TODO: 结构化校验失败 log
+          console.log("subform errs:", errs.slice(0, -1));
+          console.log("errs:", last(errs));
+        }
+      });
     },
     getDeepSubforms(formInstance) {
       if (!formInstance.subForms) {
@@ -96,10 +93,10 @@ export default {
           })
       );
     },
-    getValueFromEvent: (props, values, allValues) => {
+    getValueFromEvent(props, values, allValues) {
       return allValues;
     },
-    subFormMounted: (field, subForm) => {
+    subFormMounted(field, subForm) {
       console.log(`SubForm： ${field.name} mounted`);
       this.form.subForms = {
         ...(this.form.subForms || {}),
