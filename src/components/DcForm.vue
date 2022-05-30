@@ -12,12 +12,9 @@
 </template>
 
 <script>
+import { last, partial, assign, get } from "lodash";
 import DcFormItem from "./DcFormItem";
-
 const VALUES_CHANGE_EVENT = "values-change";
-const getValueFromEvent = function (props, values, allValues) {
-  return allValues;
-};
 
 export default {
   name: "DcForm",
@@ -31,76 +28,87 @@ export default {
     },
   },
   beforeCreate() {
+    // 初始化表单实例，绑定 自定义 onChange 事件
     this.form = this.$form.createForm(this, {
-      onValuesChange: (...args) => this.$emit(VALUES_CHANGE_EVENT, ...args),
+      onValuesChange: partial(this.$emit, VALUES_CHANGE_EVENT).bind(this),
     });
   },
   computed: {
     innerFields() {
-      return this.fields.map((item) => {
-        if (item.type === "DcForm") {
-          return {
-            ...item,
+      // 对子表单做特殊处理，实现自定义表单的约定，参考https://1x.antdv.com/components/form-cn/#components-form-demo-customized-form-controls
+      return this.fields.map((field) => {
+        if (field.type === "DcForm") {
+          return assign({}, field, {
             trigger: VALUES_CHANGE_EVENT,
-            getValueFromEvent: getValueFromEvent.bind(this),
-            listeners: {
-              mounted: (form) => {
-                this.form.subForms = {
-                  ...(this.form.subForms || {}),
-                  [item.name]: form,
-                };
-              },
-            },
-          };
+            getValueFromEvent: this.getValueFromEvent,
+            listeners: assign({}, get(field, "listeners", {}), {
+              mounted: partial(this.subFormMounted, field).bind(this), // 将子表单实例关联到父表单实例
+            }),
+          });
         }
-        return item;
+        return field;
       });
     },
   },
   methods: {
     handleSubmit(e) {
       e.preventDefault();
-      const validators = Object.values(this.form.subForms)
-        .map(
-          (form) =>
-            new Promise((resolve, reject) => {
-              form.validateFields((err) => {
-                if (err) {
-                  reject(err);
-                } else {
-                  resolve();
-                }
-              });
-            })
-        )
-        .concat(
+      // 根据表单实例，递归获取所有表单实例数组（包含子表单）
+      const validators = this.getValidators();
+      // 全部表单实例校验通过后，认为表单校验成功
+      Promise.allSettled(validators)
+        .then((res) => {
+          if (res.every((item) => item.status === "fulfilled")) {
+            this.$emit("submit", get(last(res), "value"));
+          } else {
+            throw new Error(res.map((item) => item.reason));
+          }
+        })
+        .catch((errs) => {
+          // TODO: 结构化的报错 log
+          console.log("subform errs:", errs(errs.slice(0, -1)));
+          console.log("errs:", errs.slice(-1));
+        });
+    },
+    getDeepSubforms(formInstance) {
+      if (!formInstance.subForms) {
+        return [];
+      }
+      return Object.values(formInstance.subForms).reduce((acc, item) => {
+        return [...acc, item, ...this.getDeepSubforms(item)];
+      }, []);
+    },
+    getForms() {
+      return this.getDeepSubforms(this.form).concat(this.form);
+    },
+    getValidators() {
+      const forms = this.getForms();
+      return forms.map(
+        (form) =>
           new Promise((resolve, reject) => {
-            this.form.validateFields((err, values) => {
-              if (!err) {
-                resolve(values);
-              } else {
+            form.validateFields((err, values) => {
+              if (err) {
                 reject(err);
+              } else {
+                resolve(values);
               }
             });
           })
-        );
-      Promise.allSettled(validators).then((res) => {
-        if (res.every((item) => item.status === "fulfilled")) {
-          this.$emit("submit", res.slice(-1)[0].value);
-        } else {
-          console.log(
-            "subform errs:",
-            res.slice(0, -1).map((item) => item.reason)
-          );
-          console.log(
-            "errs:",
-            res.slice(-1).map((item) => item.reason)
-          );
-        }
-      });
+      );
+    },
+    getValueFromEvent: (props, values, allValues) => {
+      return allValues;
+    },
+    subFormMounted: (field, subForm) => {
+      console.log(`SubForm： ${field.name} mounted`);
+      this.form.subForms = {
+        ...(this.form.subForms || {}),
+        [field.name]: subForm,
+      };
     },
   },
   mounted() {
+    // 子表单挂载时，通知父表单，派发子表单实例
     this.$emit("mounted", this.form);
   },
 };

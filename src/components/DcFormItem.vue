@@ -4,7 +4,7 @@
       v-bind:is="type"
       v-decorator="[name, { ...$attrs }]"
       v-bind="{ ...$props, ...$attrs }"
-      v-on="$attrs.listeners"
+      v-on="listeners"
     ></component>
   </a-form-item>
 </template>
@@ -30,8 +30,10 @@ export default {
       default: "placeholder",
     },
   },
-  mounted() {
-    // console.log(this.$attrs);
+  computed: {
+    listeners() {
+      return this.$attrs.listeners || {};
+    },
   },
 };
 </script>
